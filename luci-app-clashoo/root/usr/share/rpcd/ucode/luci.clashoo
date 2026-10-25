@@ -892,11 +892,13 @@ return full;
 function selected_mihomo_stable() {
 let bundled = '/usr/libexec/clashoo/mihomo-stable';
 let manual = '/usr/share/clashoo/bin/mihomo-stable';
+if (access(manual, 'x') && read_first_line('/usr/share/clashoo/clash_meta_version') == 'custom-url') return manual;
 if (!access(bundled, 'x')) return access(manual, 'x') ? manual : '';
 if (!access(manual, 'x')) return bundled;
-let bv = match(core_short_version(bundled), /^v([0-9]+)\.([0-9]+)\.([0-9]+)$/);
-let mv = match(core_short_version(manual), /^v([0-9]+)\.([0-9]+)\.([0-9]+)$/);
-if (!bv || !mv) return manual;
+let bv = match(core_short_version(bundled), /^v?([0-9]+)\.([0-9]+)\.([0-9]+)$/);
+let mv = match(core_short_version(manual), /^v?([0-9]+)\.([0-9]+)\.([0-9]+)$/);
+if (!bv) return mv ? manual : bundled;
+if (!mv) return bundled;
 for (let i = 1; i <= 3; i++) {
 	if (int(mv[i]) > int(bv[i])) return manual;
 	if (int(mv[i]) < int(bv[i])) return bundled;

@@ -186,10 +186,20 @@ _migrate_legacy_mihomo_stable() {
 
 _mihomo_stable_binary() {
 	local bundled=/usr/libexec/clashoo/mihomo-stable manual=/usr/share/clashoo/bin/mihomo-stable bundled_ver manual_ver
+	# A successful custom download is an explicit override, even if its version is older.
+	if [ -x "$manual" ] &&
+		[ "$(sed -n '1{s/^[[:space:]]*//;s/[[:space:]]*$//;p;}' /usr/share/clashoo/clash_meta_version 2>/dev/null)" = "custom-url" ]; then
+		echo "$manual"
+		return 0
+	fi
 	[ -x "$bundled" ] || { [ -x "$manual" ] && { echo "$manual"; return 0; }; return 1; }
 	[ -x "$manual" ] || { echo "$bundled"; return; }
-	bundled_ver="$("$bundled" -v 2>/dev/null | sed -n 's/.* Meta v\([0-9][0-9.]*\).*/\1/p' | head -n 1)"
-	manual_ver="$("$manual" -v 2>/dev/null | sed -n 's/.* Meta v\([0-9][0-9.]*\).*/\1/p' | head -n 1)"
+	bundled_ver="$("$bundled" -v 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "Meta") {print $(i + 1); exit}}')"
+	manual_ver="$("$manual" -v 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "Meta") {print $(i + 1); exit}}')"
+	bundled_ver="${bundled_ver#v}"
+	manual_ver="${manual_ver#v}"
+	printf '%s\n' "$bundled_ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || bundled_ver=""
+	printf '%s\n' "$manual_ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || manual_ver=""
 	if [ -n "$bundled_ver" ] && [ -n "$manual_ver" ]; then
 		if awk -v manual="$manual_ver" -v bundled="$bundled_ver" 'BEGIN {
 			split(manual, m, "."); split(bundled, b, ".");
@@ -203,8 +213,10 @@ _mihomo_stable_binary() {
 		else
 			echo "$bundled"
 		fi
-	else
+	elif [ -n "$manual_ver" ]; then
 		echo "$manual"
+	else
+		echo "$bundled"
 	fi
 }
 
