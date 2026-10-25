@@ -1170,6 +1170,12 @@ _dns_node_policy_capture() {
 	[ -r "$helper" ] || return 0
 	[ -s "$CONFIG_YAML" ] || return 0
 
+	# skip mode (user turned off rule-following / set respect-rules: false) keeps
+	# the source DNS verbatim: mihomo already falls back to the normal DNS policy
+	# for node domains when no dedicated resolver is generated, so mirroring there
+	# would only add fields the user did not ask for.
+	[ "$(_dns_nameserver_inherit_mode)" = "skip" ] && return 0
+
 	# Large airports can list thousands of nodes: pass the source through a temp
 	# file instead of an env var, which is capped at ~128KB per variable.
 	source_file="${TMPDIR:-/tmp}/clashoo_node_dns_source.$$".json
@@ -1194,7 +1200,7 @@ _dns_node_policy_apply() {
 	command -v yq >/dev/null 2>&1 || return 0
 	[ -s "$CONFIG_YAML" ] || return 0
 
-	# explicit proxy-server-nameserver-policy entries keep precedence
+	# existing keys keep their value; overlapping patterns are left to mihomo
 	yq -M e -i '(.dns // {}) as $dns |
 		(strenv(CLASHOO_NODE_DNS_POLICY) | from_json) as $derived |
 		.dns."proxy-server-nameserver-policy" = ($derived * ($dns."proxy-server-nameserver-policy" // {}))
