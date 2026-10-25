@@ -91,7 +91,7 @@ define Package/luci-i18n-clashoo-zh-cn/postinst
 if [ -z "$${IPKG_INSTROOT}" ]; then
 	# just clear the LuCI cache so the new translations load on next request;
 	# no service restart needed (and none that would drop the login session).
-	rm -rf /tmp/luci*
+	rm -rf /tmp/luci-indexcache /tmp/luci-modulecache
 fi
 exit 0
 endef
