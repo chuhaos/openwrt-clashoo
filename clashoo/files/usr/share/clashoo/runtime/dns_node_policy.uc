@@ -1,6 +1,8 @@
 #!/usr/bin/ucode
 'use strict';
 
+import { readfile } from 'fs';
+
 // Mirror node-domain DNS policies from the subscription into
 // proxy-server-nameserver-policy (issue #73).
 //
@@ -13,11 +15,25 @@
 // which may return overseas CDN IPs that some lines cannot reach at all, leaving
 // every node (AnyTLS is TCP-only) timing out.
 //
-// Input : CLASHOO_NODE_DNS_SOURCE = {"policies": {...}, "servers": [...]}
+// Input : CLASHOO_NODE_DNS_SOURCE_FILE = path to {"policies": {...}, "servers": [...]}
+//         (CLASHOO_NODE_DNS_SOURCE with the JSON itself is still accepted)
 // Output: JSON map with only the policy entries matching a node server domain
 //         (nothing is printed when there is no match)
 
-let source = getenv('CLASHOO_NODE_DNS_SOURCE') || '';
+let source = '';
+let source_file = getenv('CLASHOO_NODE_DNS_SOURCE_FILE') || '';
+
+if (length(source_file)) {
+	try {
+		source = readfile(source_file) || '';
+	}
+	catch (e) {
+		exit(0);
+	}
+}
+else {
+	source = getenv('CLASHOO_NODE_DNS_SOURCE') || '';
+}
 
 if (!length(source))
 	exit(0);
@@ -41,11 +57,16 @@ if (type(policies) != 'object' || type(servers) != 'array')
 	exit(0);
 
 let domains = [];
+let seen = {};
 
 for (let server in servers) {
 	if (type(server) != 'string' || !length(server))
 		continue;
-	push(domains, lc(server));
+	server = lc(server);
+	if (seen[server])
+		continue;
+	seen[server] = true;
+	push(domains, server);
 }
 
 if (!length(domains))

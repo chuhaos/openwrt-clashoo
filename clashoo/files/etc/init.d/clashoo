@@ -1163,23 +1163,29 @@ _dns_nameserver_inherit_mode() {
 # server domain before mixin drops them.
 _dns_node_policy_capture() {
 	CLASHOO_NODE_DNS_POLICY=""
-	local helper
+	local helper source_file
 	helper="${CLASHOO_NODE_DNS_UC:-/usr/share/clashoo/runtime/dns_node_policy.uc}"
 	command -v yq >/dev/null 2>&1 || return 0
 	command -v ucode >/dev/null 2>&1 || return 0
 	[ -r "$helper" ] || return 0
 	[ -s "$CONFIG_YAML" ] || return 0
 
-	local source
-	source="$(yq -M e -o=json -I0 '({"policies": (.dns."nameserver-policy" // {}), "servers": [(.proxies // [])[] | select(type == "!!map") | .server // ""]})' "$CONFIG_YAML" 2>/dev/null)"
-	[ -n "$source" ] || return 0
+	# Large airports can list thousands of nodes: pass the source through a temp
+	# file instead of an env var, which is capped at ~128KB per variable.
+	source_file="${TMPDIR:-/tmp}/clashoo_node_dns_source.$$".json
+	if ! yq -M e -o=json -I0 '({"policies": (.dns."nameserver-policy" // {}), "servers": [(.proxies // [])[] | select(type == "!!map") | .server // ""]})' "$CONFIG_YAML" > "$source_file" 2>/dev/null ||
+		[ ! -s "$source_file" ]; then
+		rm -f "$source_file"
+		return 0
+	fi
 
-	CLASHOO_NODE_DNS_POLICY="$(CLASHOO_NODE_DNS_SOURCE="$source" ucode "$helper" 2>/dev/null)"
+	CLASHOO_NODE_DNS_POLICY="$(CLASHOO_NODE_DNS_SOURCE_FILE="$source_file" ucode "$helper" 2>/dev/null)"
+	rm -f "$source_file"
 	case "$CLASHOO_NODE_DNS_POLICY" in
 		''|'{}'|'null') CLASHOO_NODE_DNS_POLICY=""; return 0 ;;
 	esac
 	export CLASHOO_NODE_DNS_POLICY
-	unset source helper
+	unset source_file helper
 	return 0
 }
 
