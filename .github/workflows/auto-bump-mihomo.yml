@@ -30,7 +30,8 @@ jobs:
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Unexpected stable tag: $tag"; exit 1; }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
-          if [ "$(sed -n 's/^PKG_UPSTREAM_VERSION:=//p' clashoo/Makefile)" = "${tag#v}" ]; then
+          current=$(sed -n 's/^PKG_UPSTREAM_VERSION:=//p' clashoo/Makefile)
+          if [ -n "$current" ] && [ "$(printf '%s\n' "$current" "${tag#v}" | sort -V | tail -n 1)" = "$current" ]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -61,8 +62,13 @@ jobs:
           hash=$(sha256sum "${tarball}" | cut -d ' ' -f 1)
 
           # The candidate build downloads this exact immutable source asset.
-          if ! gh release view mihomo-src --repo "$GITHUB_REPOSITORY" --json assets \
-               --jq '.assets[].name' | grep -Fxq "$tarball"; then
+          existing_digest=$(gh release view mihomo-src --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq ".assets[] | select(.name == \"$tarball\") | .digest")
+          if [ -n "$existing_digest" ] && [ "$existing_digest" != "sha256:${hash}" ]; then
+            echo "Source asset digest mismatch: $tarball"
+            exit 1
+          fi
+          if [ -z "$existing_digest" ]; then
             gh release upload mihomo-src "$tarball" --repo "$GITHUB_REPOSITORY"
           fi
 
@@ -82,3 +88,4 @@ jobs:
           gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
             --title "chore: bump mihomo stable to ${TAG}" \
             --body "Pin the mihomo stable source to ${TAG}. Review the package matrix and upgrade checks before merging."
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$branch" -f build_only=true

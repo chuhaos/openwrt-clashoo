@@ -11,6 +11,10 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
+      build_only:
+        description: '仅构建候选包，不发布 Release 或 feed'
+        type: boolean
+        default: false
       prerelease:
         description: '标记为预发布版本'
         type: boolean
@@ -113,7 +117,7 @@ jobs:
   release:
     name: Create Release
     needs: build
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && inputs.build_only != true }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -302,7 +306,7 @@ jobs:
     name: Upload Feed to B2
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && inputs.build_only != true }}
     permissions:
       actions: write
       contents: read
