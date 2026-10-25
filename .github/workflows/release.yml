@@ -27,6 +27,8 @@ jobs:
   build:
     name: ${{ matrix.arch }} · SDK ${{ matrix.sdk }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -55,11 +57,11 @@ jobs:
           PACKAGES: clashoo luci-app-clashoo
           NO_REFRESH_CHECK: true
           INDEX: 1
-          # 用稳定 dllkids key 签名（用户装一次公钥即永久信任）：
+          # 发布包用稳定 dllkids key 签名；PR 和 build_only 候选包不接触私钥：
           # KEY_BUILD = usign Ed25519 私钥，给 opkg Packages.gz 签名
           # PRIVATE_KEY = ECDSA P-256 PEM 私钥，给 apk packages.adb 签名
-          KEY_BUILD: ${{ secrets.OPKG_KEY_BUILD }}
-          PRIVATE_KEY: ${{ secrets.APK_PRIVATE_KEY }}
+          KEY_BUILD: ${{ github.event_name != 'pull_request' && inputs.build_only != true && secrets.OPKG_KEY_BUILD || '' }}
+          PRIVATE_KEY: ${{ github.event_name != 'pull_request' && inputs.build_only != true && secrets.APK_PRIVATE_KEY || '' }}
 
       - name: Collect packages
         run: |
