@@ -1156,6 +1156,54 @@ _dns_nameserver_inherit_mode() {
 	printf '%s' inherit
 }
 
+# issue #73: mihomo resolves proxy server domains through
+# proxy-server-nameserver(-policy) and ignores nameserver-policy there. Airports
+# ship their own resolver for node domains (e.g. "+.chylink.xyz" -> DoT) which
+# answers with reachable relay IPs, so mirror the entries that match a node
+# server domain before mixin drops them.
+_dns_node_policy_capture() {
+	CLASHOO_NODE_DNS_POLICY=""
+	local helper
+	helper="${CLASHOO_NODE_DNS_UC:-/usr/share/clashoo/runtime/dns_node_policy.uc}"
+	command -v yq >/dev/null 2>&1 || return 0
+	command -v ucode >/dev/null 2>&1 || return 0
+	[ -r "$helper" ] || return 0
+	[ -s "$CONFIG_YAML" ] || return 0
+
+	local source
+	source="$(yq -M e -o=json -I0 '({"policies": (.dns."nameserver-policy" // {}), "servers": [(.proxies // [])[] | select(type == "!!map") | .server // ""]})' "$CONFIG_YAML" 2>/dev/null)"
+	[ -n "$source" ] || return 0
+
+	CLASHOO_NODE_DNS_POLICY="$(CLASHOO_NODE_DNS_SOURCE="$source" ucode "$helper" 2>/dev/null)"
+	case "$CLASHOO_NODE_DNS_POLICY" in
+		''|'{}'|'null') CLASHOO_NODE_DNS_POLICY=""; return 0 ;;
+	esac
+	export CLASHOO_NODE_DNS_POLICY
+	unset source helper
+	return 0
+}
+
+_dns_node_policy_apply() {
+	[ -n "${CLASHOO_NODE_DNS_POLICY:-}" ] || return 0
+	command -v yq >/dev/null 2>&1 || return 0
+	[ -s "$CONFIG_YAML" ] || return 0
+
+	# explicit proxy-server-nameserver-policy entries keep precedence
+	yq -M e -i '(.dns // {}) as $dns |
+		(strenv(CLASHOO_NODE_DNS_POLICY) | from_json) as $derived |
+		.dns."proxy-server-nameserver-policy" = ($derived * ($dns."proxy-server-nameserver-policy" // {}))
+	' "$CONFIG_YAML" 2>/dev/null || return 0
+
+	# mihomo rejects a node policy without a proxy node resolver
+	if [ "$(yq -M e -r '((.dns."proxy-server-nameserver" // []) | length)' "$CONFIG_YAML" 2>/dev/null)" = "0" ]; then
+		yq -M e -i '.dns."proxy-server-nameserver" = (.dns."default-nameserver" // ["223.5.5.5"])' "$CONFIG_YAML" 2>/dev/null || true
+	fi
+
+	unset CLASHOO_NODE_DNS_POLICY
+	log_msg "Inherited node domain DNS policy from subscription" "已从订阅继承节点域名 DNS 策略"
+	return 0
+}
+
 _dns_proxy_nameservers() {
 	local i=0 t en a p port s out="" prefix
 	while :; do
@@ -2103,7 +2151,9 @@ _start_prepare_config() {
 			cp -f /usr/share/clashoo/ruleset/cn.mrs /etc/clashoo/ruleset/cn.mrs 2>/dev/null
 		fi
 	fi
+	_dns_node_policy_capture
 	yml_change >/dev/null 2>&1
+	_dns_node_policy_apply
 	append_luci_fake_ip_filter_extras >/dev/null 2>&1
 	normalize_fake_ip_filter >/dev/null 2>&1
 	drop_legacy_cn_ip_injection >/dev/null 2>&1
