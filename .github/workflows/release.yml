@@ -254,7 +254,7 @@ jobs:
 
           cat release_notes.md
 
-      - name: Replace Existing Manual Release
+      - name: Guard Manual Release Tag
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -262,7 +262,8 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
-            gh release delete "$TAG" -R "$REPO" --yes --cleanup-tag
+            echo "Release $TAG already exists; use a new tag to preserve rollback packages."
+            exit 1
           fi
 
       - name: Publish Release
@@ -304,7 +305,7 @@ jobs:
 
   upload_feed:
     name: Upload Feed to B2
-    needs: build
+    needs: [build, release]
     runs-on: ubuntu-latest
     if: ${{ github.event_name != 'pull_request' && inputs.build_only != true }}
     permissions:
