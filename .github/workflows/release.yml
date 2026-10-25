@@ -1,6 +1,11 @@
 name: Build & Release
 
 on:
+  pull_request:
+    paths:
+      - 'clashoo/**'
+      - 'luci-app-clashoo/**'
+      - '.github/workflows/release.yml'
   push:
     tags:
       - 'v*'
@@ -86,16 +91,29 @@ jobs:
             cp -v "$f" dist/feed/
           done
 
+      - name: Verify candidate packages
+        run: |
+          if [ '${{ matrix.sdk }}' = '24.10' ]; then
+            ls dist/release/clashoo_*_${{ matrix.arch }}.ipk >/dev/null
+            ls dist/release/luci-app-clashoo_*.ipk >/dev/null
+            test -s dist/feed/Packages.gz
+          else
+            ls dist/release/clashoo-*-${{ matrix.arch }}.apk >/dev/null
+            ls dist/release/luci-app-clashoo-*-${{ matrix.arch }}.apk >/dev/null
+            test -s dist/feed/packages.adb
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: packages-sdk${{ matrix.sdk }}-${{ matrix.arch }}
           path: dist/
-          if-no-files-found: ignore
+          if-no-files-found: error
 
   release:
     name: Create Release
     needs: build
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -284,7 +302,7 @@ jobs:
     name: Upload Feed to B2
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ !cancelled() }}
+    if: ${{ github.event_name != 'pull_request' }}
     permissions:
       actions: write
       contents: read
