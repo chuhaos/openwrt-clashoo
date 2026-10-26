@@ -6,7 +6,7 @@ PKG_UPSTREAM_TAG:=v$(PKG_UPSTREAM_VERSION)
 PKG_SHORT_SHA:=3f27ef3
 
 PKG_VERSION:=2026.10.25.$(PKG_UPSTREAM_VERSION)
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE:=$(PKG_NAME)-stable-$(PKG_UPSTREAM_TAG)-$(PKG_SHORT_SHA).tar.gz
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-stable-$(PKG_UPSTREAM_TAG)-$(PKG_SHORT_SHA)
@@ -130,9 +130,9 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 	rm -rf /usr/share/clashoo/create
 	# 旧方案把 stable 内核放在 /usr/bin/mihomo-stable，现方案改用
 	# /usr/libexec/clashoo/mihomo-stable（随包）+ /usr/share/clashoo/bin/（自定义下载）。
-	# preinst 已把它抄到 /usr/share/clashoo/bin/mihomo-stable，确认迁移到位后才删
-	# 旧位置，回收约 60MB 根分区空间；迁移未成功时留着，宁可占空间也不丢内核。
-	if [ -f /usr/share/clashoo/bin/mihomo-stable ] && [ -f /usr/bin/mihomo-stable ] && [ ! -L /usr/bin/mihomo-stable ]; then
+	# preinst 已把它抄到 /usr/share/clashoo/bin/mihomo-stable，确认内容相同后才删
+	# 旧位置；目标已有其他自定义内核时保留旧文件，避免误删。
+	if [ -f /usr/share/clashoo/bin/mihomo-stable ] && [ -f /usr/bin/mihomo-stable ] && [ ! -L /usr/bin/mihomo-stable ] && cmp -s /usr/bin/mihomo-stable /usr/share/clashoo/bin/mihomo-stable; then
 		rm -f /usr/bin/mihomo-stable
 	fi
 	/usr/share/clashoo/migrate_lan_acl.sh >/dev/null 2>&1 || true
