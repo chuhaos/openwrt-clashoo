@@ -128,6 +128,13 @@ if [ -z "$${IPKG_INSTROOT}" ]; then
 	rm -f /usr/share/clashoo/cuslist.sh /usr/share/clashoo/groups.sh /usr/share/clashoo/load_groups.sh /usr/share/clashoo/panel_diag.sh
 	rm -f /usr/share/clashoo/rmlist.sh /usr/share/clashoo/uplist.sh /usr/share/clashoo/rpc_restart_async.sh /usr/share/clashoo/rpc_update_china_ip_async.sh
 	rm -rf /usr/share/clashoo/create
+	# 旧方案把 stable 内核放在 /usr/bin/mihomo-stable，现方案改用
+	# /usr/libexec/clashoo/mihomo-stable（随包）+ /usr/share/clashoo/bin/（自定义下载）。
+	# preinst 已把它抄到 /usr/share/clashoo/bin/mihomo-stable，确认迁移到位后才删
+	# 旧位置，回收约 60MB 根分区空间；迁移未成功时留着，宁可占空间也不丢内核。
+	if [ -f /usr/share/clashoo/bin/mihomo-stable ] && [ -f /usr/bin/mihomo-stable ] && [ ! -L /usr/bin/mihomo-stable ]; then
+		rm -f /usr/bin/mihomo-stable
+	fi
 	/usr/share/clashoo/migrate_lan_acl.sh >/dev/null 2>&1 || true
 	/usr/share/clashoo/migrate_fake_ip_filter.sh >/dev/null 2>&1 || true
 	/usr/share/clashoo/detect_core_arch.sh >/dev/null 2>&1 || true
