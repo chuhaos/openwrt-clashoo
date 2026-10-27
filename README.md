@@ -132,6 +132,16 @@ wget -O - https://raw.githubusercontent.com/kenzok8/openwrt-clashoo/refs/heads/m
 wget -O - https://ghfast.top/https://raw.githubusercontent.com/kenzok8/openwrt-clashoo/refs/heads/main/scripts/install.sh | ash
 ```
 
+安装脚本的校验行为：
+
+- 默认只从**签名 feed** 安装：先比对内置的公钥指纹（见 [`keys/`](keys/README.md)），再用 apk/opkg 校验索引签名与包摘要
+- 公钥指纹不匹配、索引验签失败或包摘要不符时**直接停止**，不会自动降级
+- 只有签名 feed 不可达（网络原因）时，才可以用 `CLASHOO_ALLOW_GITHUB_FALLBACK=1` 显式开启 GitHub Release 回退；该路径只校验 GitHub 记录的 SHA-256，**不是包签名验证**，也不防发布账号失陷
+
+```bash
+CLASHOO_ALLOW_GITHUB_FALLBACK=1 sh install.sh
+```
+
 ### 软件源安装
 
 在 OpenWrt 路由器上执行以下命令：
